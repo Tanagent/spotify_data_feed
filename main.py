@@ -12,7 +12,37 @@ file_path = './config/api.json'
 with open(file_path) as f:
     spotify_api = json.loads(f.read())
 
+def check_if_valid_data(df: pd.DataFrame) -> bool:
+    # Check if dataframe is empty
+    if df.empty:
+        print("No songs downloaded. Finishing execution")
+        return False
+    
+    # Primary Key Check
+    if pd.Series(df['played_at']).is_unique:
+        pass
+    else:
+        raise Exception("Primary Key Check is violated")
+
+    # Check for nulls
+    if df.isnull().values.any():
+        raise Exception("Null valued found")
+
+    # Check that all timestamps are of yesterday's date
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    timestamps = df["timestamp"].tolist()
+    for timestamp in timestamps:
+        if datetime.datetime.strptime(timestamp, '%Y-%m-%d') != yesterday:
+            raise Exception("At least one of the returned songs does not have a yesterday's timestamp")
+    
+    return True
+
 if __name__ == "__main__":
+
+    # Extract part of the ETL process
+
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -20,10 +50,10 @@ if __name__ == "__main__":
     }
 
     today = datetime.datetime.now()
-    yesterday = today - datetime.timedelta(days = 1)
+    yesterday = today - datetime.timedelta(days=2)
     yesterday_unix_timestamp = int(yesterday.timestamp()) * 1000
 
-    r = requests.get("https://api.spotify.com/v1/me/player/recently-played?after={time}".format(time = yesterday_unix_timestamp), headers = headers)
+    r = requests.get("https://api.spotify.com/v1/me/player/recently-played?after={time}".format(time=yesterday_unix_timestamp), headers=headers)
 
     data = r.json()
 
@@ -47,4 +77,6 @@ if __name__ == "__main__":
 
     song_df = pd.DataFrame(song_dict, columns = ["song_name", "artist_name", "played_at", "timestamp"])
 
-    print(song_df)
+    # Validate
+    if check_if_valid_data(song_df):
+        print("Data valid. Proceed to Load stage")
